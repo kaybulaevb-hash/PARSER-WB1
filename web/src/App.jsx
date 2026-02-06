@@ -35,6 +35,7 @@ export default function App() {
   const [wbToken, setWbToken] = useState("");
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [catalogView, setCatalogView] = useState("grid");
   const [loading, setLoading] = useState(false);
   const [needsToken, setNeedsToken] = useState(false);
   const [error, setError] = useState("");
@@ -118,7 +119,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <div className="title">WB Mini App</div>
+        <div className="title">Парсер WB</div>
         <div className="subtitle">Telegram ID: {userId ?? "..."}</div>
       </header>
 
@@ -144,13 +145,38 @@ export default function App() {
       {!needsToken && !selected && (
         <section>
           <div className="toolbar">
+            <div className="view-toggle">
+              <button
+                className={catalogView === "grid" ? "active" : ""}
+                onClick={() => setCatalogView("grid")}
+                disabled={loading}
+              >
+                Плитка
+              </button>
+              <button
+                className={catalogView === "list" ? "active" : ""}
+                onClick={() => setCatalogView("list")}
+                disabled={loading}
+              >
+                Список
+              </button>
+            </div>
             <button onClick={() => loadProducts()} disabled={loading}>
               Обновить список
             </button>
           </div>
-          <div className="grid">
+          <div className={catalogView === "grid" ? "grid" : "list"}>
             {products.map((product) => (
-              <div key={product.nm_id} className="product-card">
+              <div
+                key={product.nm_id}
+                className={catalogView === "grid" ? "product-card" : "product-row"}
+                onClick={() => setSelected(product)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setSelected(product);
+                }}
+              >
                 {product.photo_url ? (
                   <img src={product.photo_url} alt={product.title} />
                 ) : (
@@ -162,7 +188,9 @@ export default function App() {
                     WB {product.nm_id} · {product.vendor_code}
                   </div>
                 </div>
-                <button onClick={() => setSelected(product)}>Открыть</button>
+                <button className="open-btn" onClick={() => setSelected(product)}>
+                  Открыть
+                </button>
               </div>
             ))}
           </div>
