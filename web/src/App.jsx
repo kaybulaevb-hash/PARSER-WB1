@@ -106,6 +106,21 @@ export default function App() {
     setError("");
     setNotice("");
     setLoading(true);
+    if (type === "reviews") {
+      const res = await apiPost("/api/send", {
+        initData,
+        nmId: selected.nm_id,
+        type: "reviews",
+      });
+      if (!res.ok) {
+        setError(res.payload?.error || "Не удалось отправить файл в чат.");
+        setLoading(false);
+        return;
+      }
+      setNotice("Отзывы отправлены в чат с ботом.");
+      setLoading(false);
+      return;
+    }
     const response = await fetch(`/api/${type}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,25 +134,6 @@ export default function App() {
     }
     const blob = await response.blob();
     downloadBlob(blob, `${type}_${selected.nm_id}.csv`);
-    setLoading(false);
-  };
-
-  const handleSendToChat = async (type) => {
-    if (!selected) return;
-    setError("");
-    setNotice("");
-    setLoading(true);
-    const res = await apiPost("/api/send", {
-      initData,
-      nmId: selected.nm_id,
-      type,
-    });
-    if (!res.ok) {
-      setError(res.payload?.error || "Не удалось отправить файл в чат.");
-      setLoading(false);
-      return;
-    }
-    setNotice("Файл отправлен в чат с ботом.");
     setLoading(false);
   };
 
@@ -266,12 +262,6 @@ export default function App() {
                 </button>
                 <button onClick={() => handleDownload("questions")} disabled={loading}>
                   Скачать вопросы CSV
-                </button>
-                <button onClick={() => handleSendToChat("reviews")} disabled={loading}>
-                  Отправить отзывы в чат
-                </button>
-                <button onClick={() => handleSendToChat("questions")} disabled={loading}>
-                  Отправить вопросы в чат
                 </button>
               </div>
             </div>
