@@ -1,0 +1,174 @@
+:root {
+  color-scheme: light;
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+  background: #f3f5f7;
+  color: #1c1f24;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(120deg, #f3f5f7, #eef2f7);
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.subtitle {
+  color: #5e6572;
+  font-size: 13px;
+}
+
+.alert {
+  background: #ffe5e5;
+  border: 1px solid #ffb3b3;
+  color: #a11a1a;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 14px 30px rgba(21, 32, 43, 0.08);
+  margin-bottom: 20px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+input {
+  flex: 1;
+  min-width: 220px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #d9dee6;
+  font-size: 14px;
+}
+
+button {
+  border: none;
+  background: #111827;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.product-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(21, 32, 43, 0.08);
+}
+
+.product-card img,
+.detail img {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  aspect-ratio: 4 / 5;
+}
+
+.placeholder {
+  background: #f0f2f4;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: #7a8492;
+}
+
+.product-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.product-sub {
+  color: #68707d;
+  font-size: 12px;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 20px;
+}
+
+.detail-info h2 {
+  margin-top: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.back {
+  background: transparent;
+  color: #111827;
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.loading {
+  margin-top: 16px;
+  color: #5f6672;
+}
+
+@media (max-width: 720px) {
+  .detail {
+    grid-template-columns: 1fr;
+  }
+}

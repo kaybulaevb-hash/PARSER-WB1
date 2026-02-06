@@ -94,3 +94,34 @@ git push -u origin main
 ```
 
 Важно: не коммитьте реальные токены в репозиторий.
+
+## Mini App (Vercel + Vite/React)
+Проект содержит:
+- `web/` — фронтенд (Vite + React)
+- `api/` — Vercel Functions (Telegram auth + WB API + CSV)
+
+### Локальный запуск (frontend)
+```bash
+cd web
+npm install
+npm run dev
+```
+
+### Переменные окружения для Vercel
+В Vercel → Project Settings → Environment Variables:
+- `TELEGRAM_BOT_TOKEN` — токен бота
+- `KV_REST_API_URL` и `KV_REST_API_TOKEN` — Vercel KV (обязательно для хранения WB токенов)
+- `WB_FEEDBACK_BASE_URL` (опционально, по умолчанию https://feedbacks-api.wildberries.ru)
+- `WB_CONTENT_BASE_URL` (опционально, по умолчанию https://content-api.wildberries.ru)
+
+### Настройка BotFather
+1) `/setdomain` → `https://<your-vercel-domain>`
+2) `/setmenubutton` → Web App → `https://<your-vercel-domain>`
+
+### Как работает Mini App
+1) Пользователь открывает Mini App в Telegram
+2) Telegram передает `initData`
+3) Backend проверяет подпись (`/api/auth/telegram`)
+4) Пользователь сохраняет WB токен (`/api/wb/token`)
+5) Mini App показывает товары (`/api/products`)
+6) Выгрузка CSV (`/api/reviews` и `/api/questions`)
