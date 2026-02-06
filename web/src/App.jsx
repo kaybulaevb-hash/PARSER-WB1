@@ -36,6 +36,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [catalogView, setCatalogView] = useState("grid");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [needsToken, setNeedsToken] = useState(false);
   const [error, setError] = useState("");
@@ -116,6 +117,21 @@ export default function App() {
     setLoading(false);
   };
 
+  const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return products;
+    return products.filter((product) => {
+      const title = String(product.title || "").toLowerCase();
+      const vendor = String(product.vendor_code || "").toLowerCase();
+      const nmId = String(product.nm_id || "");
+      return (
+        title.includes(query) ||
+        vendor.includes(query) ||
+        nmId.includes(query)
+      );
+    });
+  }, [products, searchQuery]);
+
   return (
     <div className="app">
       <header className="header">
@@ -165,8 +181,15 @@ export default function App() {
               Обновить список
             </button>
           </div>
+          <div className="search">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по названию, nmID или артикулу продавца"
+            />
+          </div>
           <div className={catalogView === "grid" ? "grid" : "list"}>
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <div
                 key={product.nm_id}
                 className={catalogView === "grid" ? "product-card" : "product-row"}
