@@ -16,6 +16,7 @@ import httpx
 
 
 DEFAULT_BASE_URL = "https://feedbacks-api.wildberries.ru"
+DEFAULT_CONTENT_BASE_URL = "https://content-api.wildberries.ru"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_RETRIES = 5
 DEFAULT_PAGE_SIZE = 1000
@@ -62,8 +63,16 @@ class WBClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def _get_json(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
-        url = f"{self._base_url}{path}"
+    async def _request_json(
+        self,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+        override_base_url: str | None = None,
+    ) -> dict[str, Any]:
+        base_url = (override_base_url or self._base_url).rstrip("/")
+        url = f"{base_url}{path}"
         headers = {
             "Authorization": self._token,
             "Accept": "application/json",
@@ -71,7 +80,13 @@ class WBClient:
 
         for attempt in range(self._retries + 1):
             try:
-                response = await self._client.get(url, params=params, headers=headers)
+                response = await self._client.request(
+                    method=method.upper(),
+                    url=url,
+                    params=params,
+                    json=json_body,
+                    headers=headers,
+                )
             except httpx.RequestError as exc:
                 if attempt == self._retries:
                     raise WBAPIError(f"Сетевая ошибка: {exc}") from exc
@@ -111,6 +126,24 @@ class WBClient:
 
         raise WBAPIError("Не удалось выполнить запрос к WB API.")
 
+    async def _get_json(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
+        return await self._request_json("GET", path=path, params=params)
+
+    async def _post_json(
+        self,
+        path: str,
+        json_body: dict[str, Any],
+        params: dict[str, Any] | None = None,
+        override_base_url: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request_json(
+            "POST",
+            path=path,
+            params=params,
+            json_body=json_body,
+            override_base_url=override_base_url,
+        )
+
     async def fetch_feedbacks(self, options: FetchOptions) -> tuple[list[dict[str, Any]], bool]:
         return await self._fetch_items(
             path="/api/v1/feedbacks",
@@ -130,6 +163,75 @@ class WBClient:
             max_skip=10_000,
             max_take_plus_skip=10_000,
         )
+
+    async def fetch_product_cards(
+        self,
+        content_base_url: str = DEFAULT_CONTENT_BASE_URL,
+        locale: str = "ru",
+        page_size: int = 100,
+        max_items: int | None = 2000,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        if page_size <= 0:
+            raise ValueError("page_size должен быть > 0")
+        page_size = min(page_size, 100)
+
+        cursor_updated_at: str | None = None
+        cursor_nm_id: int | None = None
+        cards: list[dict[str, Any]] = []
+        hit_limit = False
+
+        while True:
+            cursor: dict[str, Any] = {"limit": page_size}
+            if cursor_updated_at is not None and cursor_nm_id is not None:
+                cursor["updatedAt"] = cursor_updated_at
+                cursor["nmID"] = cursor_nm_id
+
+            body = {
+                "settings": {
+                    "sort": {"ascending": False},
+                    "filter": {"withPhoto": -1},
+                    "cursor": cursor,
+                }
+            }
+            params = {"locale": locale} if locale else None
+            payload = await self._post_json(
+                path="/content/v2/get/cards/list",
+                json_body=body,
+                params=params,
+                override_base_url=content_base_url,
+            )
+
+            raw_cards = payload.get("cards")
+            if not isinstance(raw_cards, list):
+                raise WBAPIError("Неожиданный формат ответа WB API (cards).")
+            current_cards = [card for card in raw_cards if isinstance(card, dict)]
+            cards.extend(current_cards)
+
+            if max_items is not None and len(cards) >= max_items:
+                cards = cards[:max_items]
+                hit_limit = True
+                break
+
+            if len(current_cards) < page_size:
+                break
+
+            cursor_payload = payload.get("cursor")
+            if not isinstance(cursor_payload, dict):
+                break
+            next_updated_at = cursor_payload.get("updatedAt")
+            next_nm_id_raw = cursor_payload.get("nmID")
+            try:
+                next_nm_id = int(next_nm_id_raw)
+            except (TypeError, ValueError):
+                break
+            if not next_updated_at or next_nm_id <= 0:
+                break
+
+            cursor_updated_at = str(next_updated_at)
+            cursor_nm_id = next_nm_id
+            await asyncio.sleep(self._request_pause)
+
+        return cards, hit_limit
 
     async def _fetch_items(
         self,
