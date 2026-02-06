@@ -153,7 +153,7 @@ button:disabled {
   object-fit: contain;
   background: #f5f6f8;
   padding: 6px;
-  aspect-ratio: 1 / 1;
+  height: 160px;
 }
 
 .placeholder {
@@ -217,11 +217,19 @@ button:disabled {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .product-card img {
+    height: 150px;
+  }
 }
 
 @media (max-width: 860px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-card img {
+    height: 140px;
   }
 }
 
@@ -252,5 +260,9 @@ button:disabled {
 
   .product-title {
     font-size: 12px;
+  }
+
+  .product-card img {
+    height: 120px;
   }
 }
