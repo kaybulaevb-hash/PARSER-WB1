@@ -40,6 +40,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [needsToken, setNeedsToken] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (telegram?.ready) telegram.ready();
@@ -67,6 +68,7 @@ export default function App() {
 
   const loadProducts = async (initDataValue = initData) => {
     setError("");
+    setNotice("");
     const res = await apiPost("/api/products", { initData: initDataValue });
     if (!res.ok) {
       if (res.status === 401) {
@@ -86,6 +88,7 @@ export default function App() {
       setError("Введите WB токен.");
       return;
     }
+    setNotice("");
     setLoading(true);
     const res = await apiPost("/api/wb/token", { initData, wbToken: wbToken.trim() });
     if (!res.ok) {
@@ -100,6 +103,8 @@ export default function App() {
 
   const handleDownload = async (type) => {
     if (!selected) return;
+    setError("");
+    setNotice("");
     setLoading(true);
     const response = await fetch(`/api/${type}`, {
       method: "POST",
@@ -114,6 +119,25 @@ export default function App() {
     }
     const blob = await response.blob();
     downloadBlob(blob, `${type}_${selected.nm_id}.csv`);
+    setLoading(false);
+  };
+
+  const handleSendToChat = async (type) => {
+    if (!selected) return;
+    setError("");
+    setNotice("");
+    setLoading(true);
+    const res = await apiPost("/api/send", {
+      initData,
+      nmId: selected.nm_id,
+      type,
+    });
+    if (!res.ok) {
+      setError(res.payload?.error || "Не удалось отправить файл в чат.");
+      setLoading(false);
+      return;
+    }
+    setNotice("Файл отправлен в чат с ботом.");
     setLoading(false);
   };
 
@@ -140,6 +164,7 @@ export default function App() {
       </header>
 
       {error && <div className="alert">{error}</div>}
+      {notice && <div className="notice">{notice}</div>}
 
       {needsToken && (
         <section className="card">
@@ -241,6 +266,12 @@ export default function App() {
                 </button>
                 <button onClick={() => handleDownload("questions")} disabled={loading}>
                   Скачать вопросы CSV
+                </button>
+                <button onClick={() => handleSendToChat("reviews")} disabled={loading}>
+                  Отправить отзывы в чат
+                </button>
+                <button onClick={() => handleSendToChat("questions")} disabled={loading}>
+                  Отправить вопросы в чат
                 </button>
               </div>
             </div>

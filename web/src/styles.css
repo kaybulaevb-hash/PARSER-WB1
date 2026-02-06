@@ -46,6 +46,15 @@ body {
   margin-bottom: 16px;
 }
 
+.notice {
+  background: #e6f7ed;
+  border: 1px solid #9bd5ad;
+  color: #145c2e;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
 .card {
   background: #ffffff;
   border-radius: 18px;
