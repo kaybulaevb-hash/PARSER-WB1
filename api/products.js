@@ -29,9 +29,19 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const products = await fetchProductCards(wbToken);
+    const products = await fetchProductCards(wbToken, {
+      pageSize: 100,
+      maxItems: Number(process.env.WB_PRODUCTS_MAX_ITEMS || 500),
+    });
     res.status(200).json({ products });
   } catch (err) {
-    res.status(500).json({ error: err.message || "WB API error" });
+    const message = err.message || "WB API error";
+    const needsToken = /WB API (401|403)|Missing WB token/.test(message);
+    res.status(needsToken ? 400 : 500).json({
+      error: needsToken
+        ? "Сохранённый WB токен больше не подходит. Загрузите новый токен с правами «Вопросы и отзывы» и «Контент»."
+        : message,
+      needsToken,
+    });
   }
 };

@@ -71,16 +71,23 @@ export default function App() {
     setNotice("");
     const res = await apiPost("/api/products", { initData: initDataValue });
     if (!res.ok) {
-      if (res.status === 401) {
+      if (res.status === 401 && res.payload?.error === "WB token not set.") {
+        setSelected(null);
         setNeedsToken(true);
         setProducts([]);
         return;
       }
+      if (res.payload?.needsToken) {
+        setSelected(null);
+        setNeedsToken(true);
+        setProducts([]);
+      }
       setError(res.payload?.error || "Ошибка загрузки товаров.");
-      return;
+      return false;
     }
     setNeedsToken(false);
     setProducts(res.payload.products || []);
+    return true;
   };
 
   const handleSaveToken = async () => {
@@ -97,7 +104,13 @@ export default function App() {
       return;
     }
     setWbToken("");
-    await loadProducts(initData);
+    setSelected(null);
+    setNeedsToken(false);
+    setNotice("WB токен сохранён. Загружаю каталог...");
+    const loaded = await loadProducts(initData);
+    if (loaded) {
+      setNotice("WB токен сохранён. Каталог обновлён.");
+    }
     setLoading(false);
   };
 
@@ -170,7 +183,7 @@ export default function App() {
             <input
               value={wbToken}
               onChange={(e) => setWbToken(e.target.value)}
-              placeholder="WB_API_TOKEN=..."
+              placeholder="Вставьте WB токен"
             />
             <button onClick={handleSaveToken} disabled={loading}>
               Сохранить

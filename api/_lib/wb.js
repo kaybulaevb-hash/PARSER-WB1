@@ -3,6 +3,31 @@ const FEEDBACK_BASE =
 const CONTENT_BASE =
   process.env.WB_CONTENT_BASE_URL || "https://content-api.wildberries.ru";
 
+function normalizeWbToken(rawToken) {
+  if (typeof rawToken !== "string") {
+    return "";
+  }
+
+  let token = rawToken.trim();
+  if (!token) {
+    return "";
+  }
+
+  const envLikeMatch = token.match(/^[A-Z0-9_]*TOKEN\s*=\s*(.+)$/i);
+  if (envLikeMatch) {
+    token = envLikeMatch[1].trim();
+  }
+
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    token = token.slice(1, -1).trim();
+  }
+
+  return token;
+}
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -108,7 +133,12 @@ function normalizeProducts(cards) {
   return products;
 }
 
-async function fetchProductCards(token, { pageSize = 100, maxItems = 2000 } = {}) {
+async function fetchProductCards(token, { pageSize = 100, maxItems = 500 } = {}) {
+  const authToken = normalizeWbToken(token);
+  if (!authToken) {
+    throw new Error("Missing WB token.");
+  }
+
   let cursorUpdatedAt = null;
   let cursorNmId = null;
   const cards = [];
@@ -131,7 +161,7 @@ async function fetchProductCards(token, { pageSize = 100, maxItems = 2000 } = {}
     const payload = await fetchJson(`${CONTENT_BASE}/content/v2/get/cards/list`, {
       method: "POST",
       headers: {
-        Authorization: token,
+        Authorization: authToken,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -159,6 +189,10 @@ async function fetchProductCards(token, { pageSize = 100, maxItems = 2000 } = {}
 }
 
 async function fetchFeedbacks(token, { nmId, isAnswered, take = 1000, skip = 0, order = "dateDesc" }) {
+  const authToken = normalizeWbToken(token);
+  if (!authToken) {
+    throw new Error("Missing WB token.");
+  }
   const params = new URLSearchParams({
     isAnswered: String(isAnswered),
     take: String(take),
@@ -168,13 +202,17 @@ async function fetchFeedbacks(token, { nmId, isAnswered, take = 1000, skip = 0, 
   if (nmId) params.set("nmId", String(nmId));
   const url = `${FEEDBACK_BASE}/api/v1/feedbacks?${params.toString()}`;
   const payload = await fetchJson(url, {
-    headers: { Authorization: token, Accept: "application/json" },
+    headers: { Authorization: authToken, Accept: "application/json" },
   });
   const data = payload.data || payload;
   return Array.isArray(data.feedbacks) ? data.feedbacks : Array.isArray(data) ? data : [];
 }
 
 async function fetchQuestions(token, { nmId, isAnswered, take = 1000, skip = 0, order = "dateDesc" }) {
+  const authToken = normalizeWbToken(token);
+  if (!authToken) {
+    throw new Error("Missing WB token.");
+  }
   const params = new URLSearchParams({
     isAnswered: String(isAnswered),
     take: String(take),
@@ -184,7 +222,7 @@ async function fetchQuestions(token, { nmId, isAnswered, take = 1000, skip = 0, 
   if (nmId) params.set("nmId", String(nmId));
   const url = `${FEEDBACK_BASE}/api/v1/questions?${params.toString()}`;
   const payload = await fetchJson(url, {
-    headers: { Authorization: token, Accept: "application/json" },
+    headers: { Authorization: authToken, Accept: "application/json" },
   });
   const data = payload.data || payload;
   return Array.isArray(data.questions) ? data.questions : Array.isArray(data) ? data : [];
@@ -277,6 +315,7 @@ async function fetchAllQuestions(token, nmId, limit = 10000) {
 }
 
 module.exports = {
+  normalizeWbToken,
   fetchProductCards,
   fetchLatestReviews,
   fetchAllQuestions,
