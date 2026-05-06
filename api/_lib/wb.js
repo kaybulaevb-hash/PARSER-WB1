@@ -2,6 +2,8 @@ const FEEDBACK_BASE =
   process.env.WB_FEEDBACK_BASE_URL || "https://feedbacks-api.wildberries.ru";
 const CONTENT_BASE =
   process.env.WB_CONTENT_BASE_URL || "https://content-api.wildberries.ru";
+const WB_MAX_RETRIES = Number(process.env.WB_MAX_RETRIES || 4);
+const WB_RETRY_BASE_MS = Number(process.env.WB_RETRY_BASE_MS || 800);
 
 function normalizeWbToken(rawToken) {
   if (typeof rawToken !== "string") {
@@ -28,17 +30,61 @@ function normalizeWbToken(rawToken) {
   return token;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryDelayMs(response, attempt) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const asNumber = Number(retryAfter);
+    if (Number.isFinite(asNumber) && asNumber >= 0) {
+      return asNumber * 1000;
+    }
+  }
+  return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 10_000);
+}
+
+function parseWbError(status, text) {
+  let detail = text;
+  try {
+    const parsed = JSON.parse(text);
+    detail =
+      parsed?.statusText ||
+      parsed?.title ||
+      parsed?.detail ||
+      parsed?.errorText ||
+      text;
+  } catch (_) {
+    // Keep original text when response is not JSON.
+  }
+  if (status === 429) {
+    return new Error("WB API 429: Слишком много запросов. Подождите 10-30 секунд и повторите.");
+  }
+  return new Error(`WB API ${status}: ${detail}`);
+}
+
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
+  for (let attempt = 0; attempt <= WB_MAX_RETRIES; attempt += 1) {
+    const response = await fetch(url, options);
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload && payload.error === true) {
+        throw new Error(payload.errorText || "WB API error");
+      }
+      return payload;
+    }
+
     const text = await response.text();
-    throw new Error(`WB API ${response.status}: ${text}`);
+    const retriable = response.status === 429 || response.status >= 500;
+    if (!retriable || attempt === WB_MAX_RETRIES) {
+      throw parseWbError(response.status, text);
+    }
+
+    await sleep(getRetryDelayMs(response, attempt));
   }
-  const payload = await response.json();
-  if (payload && payload.error === true) {
-    throw new Error(payload.errorText || "WB API error");
-  }
-  return payload;
+
+  throw new Error("WB API error");
 }
 
 function appendPhotoVersion(url, card) {
