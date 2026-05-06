@@ -1,5 +1,5 @@
 const { verifyInitData } = require("./_lib/telegram");
-const { getValue } = require("./_lib/storage");
+const { getValue, setValueIfNotExists } = require("./_lib/storage");
 const { fetchLatestReviews, fetchAllQuestions } = require("./_lib/wb");
 const { toCsv } = require("./_lib/csv");
 
@@ -37,6 +37,16 @@ module.exports = async (req, res) => {
     return;
   }
 
+  const lockKey = `lock:${user.id}:${type}:${Number(nmId)}`;
+  const lockTtlSeconds = Number(process.env.WB_REQUEST_LOCK_SECONDS || 25);
+  const lockAcquired = await setValueIfNotExists(lockKey, "1", lockTtlSeconds);
+  if (!lockAcquired) {
+    res.status(429).json({
+      error: `Подождите ${lockTtlSeconds} сек. Предыдущая выгрузка еще обрабатывается.`,
+    });
+    return;
+  }
+
   try {
     const rows =
       type === "reviews"
@@ -64,6 +74,8 @@ module.exports = async (req, res) => {
 
     res.status(200).json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message || "Send error" });
+    const message = err.message || "Send error";
+    const isRateLimit = message.includes("WB API 429");
+    res.status(isRateLimit ? 429 : 500).json({ error: message });
   }
 };

@@ -1,4 +1,5 @@
 const memoryStore = new Map();
+const memoryTimers = new Map();
 
 function hasKV() {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
@@ -52,6 +53,43 @@ async function setValue(key, value) {
   }
 }
 
+function setMemoryValueWithTtl(key, value, ttlSeconds) {
+  memoryStore.set(key, value);
+  const previousTimer = memoryTimers.get(key);
+  if (previousTimer) clearTimeout(previousTimer);
+  const safeTtl = Math.max(1, Math.floor(ttlSeconds));
+  const timer = setTimeout(() => {
+    memoryStore.delete(key);
+    memoryTimers.delete(key);
+  }, safeTtl * 1000);
+  memoryTimers.set(key, timer);
+}
+
+async function setValueIfNotExists(key, value, ttlSeconds) {
+  const safeTtl = Math.max(1, Math.floor(ttlSeconds || 1));
+  if (!hasKV()) {
+    if (memoryStore.has(key)) return false;
+    setMemoryValueWithTtl(key, value, safeTtl);
+    return true;
+  }
+  try {
+    const result = await kvCommand([
+      "SET",
+      key,
+      value,
+      "EX",
+      String(safeTtl),
+      "NX",
+    ]);
+    return result === "OK";
+  } catch (err) {
+    console.warn("KV SET NX failed, fallback to memory:", err.message);
+    if (memoryStore.has(key)) return false;
+    setMemoryValueWithTtl(key, value, safeTtl);
+    return true;
+  }
+}
+
 async function deleteValue(key) {
   if (!hasKV()) {
     return memoryStore.delete(key);
@@ -68,6 +106,7 @@ async function deleteValue(key) {
 module.exports = {
   getValue,
   setValue,
+  setValueIfNotExists,
   deleteValue,
   hasKV,
 };

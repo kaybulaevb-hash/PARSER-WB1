@@ -2,8 +2,8 @@ const FEEDBACK_BASE =
   process.env.WB_FEEDBACK_BASE_URL || "https://feedbacks-api.wildberries.ru";
 const CONTENT_BASE =
   process.env.WB_CONTENT_BASE_URL || "https://content-api.wildberries.ru";
-const WB_MAX_RETRIES = Number(process.env.WB_MAX_RETRIES || 6);
-const WB_RETRY_BASE_MS = Number(process.env.WB_RETRY_BASE_MS || 1200);
+const WB_MAX_RETRIES = Number(process.env.WB_MAX_RETRIES || 3);
+const WB_RETRY_BASE_MS = Number(process.env.WB_RETRY_BASE_MS || 700);
 
 function normalizeWbToken(rawToken) {
   if (typeof rawToken !== "string") {
@@ -42,7 +42,7 @@ function getRetryDelayMs(response, attempt) {
       return asNumber * 1000;
     }
   }
-  return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 30_000);
+  return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 6000);
 }
 
 function parseWbError(status, text) {
@@ -76,7 +76,11 @@ async function fetchJson(url, options = {}) {
     }
 
     const text = await response.text();
-    const retriable = response.status === 429 || response.status >= 500;
+    if (response.status === 429) {
+      // Fail fast on rate-limit to avoid long UI freezes.
+      throw parseWbError(response.status, text);
+    }
+    const retriable = response.status >= 500;
     if (!retriable || attempt === WB_MAX_RETRIES) {
       throw parseWbError(response.status, text);
     }
