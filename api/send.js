@@ -1,5 +1,5 @@
 const { verifyInitData } = require("./_lib/telegram");
-const { getValue, setValueIfNotExists } = require("./_lib/storage");
+const { getValue, setValue, setValueIfNotExists } = require("./_lib/storage");
 const { fetchLatestReviews, fetchAllQuestions } = require("./_lib/wb");
 const { toCsv } = require("./_lib/csv");
 
@@ -46,6 +46,22 @@ module.exports = async (req, res) => {
     });
     return;
   }
+
+  const tokenCooldownSeconds = Number(process.env.WB_FEEDBACKS_COOLDOWN_SECONDS || 4);
+  const cooldownKey = `cooldown:${user.id}:feedbacks`;
+  const lastRaw = await getValue(cooldownKey);
+  const lastTs = Number(lastRaw || 0);
+  const nowTs = Date.now();
+  if (Number.isFinite(lastTs) && lastTs > 0) {
+    const waitMs = tokenCooldownSeconds * 1000 - (nowTs - lastTs);
+    if (waitMs > 0) {
+      res.status(429).json({
+        error: `Лимит WB: подождите ${Math.ceil(waitMs / 1000)} сек и повторите.`,
+      });
+      return;
+    }
+  }
+  await setValue(cooldownKey, String(nowTs));
 
   try {
     const rows =

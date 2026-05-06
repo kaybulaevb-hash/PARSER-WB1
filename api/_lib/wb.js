@@ -45,7 +45,7 @@ function getRetryDelayMs(response, attempt) {
   return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 6000);
 }
 
-function parseWbError(status, text) {
+function parseWbError(status, text, responseHeaders) {
   let detail = text;
   try {
     const parsed = JSON.parse(text);
@@ -59,7 +59,14 @@ function parseWbError(status, text) {
     // Keep original text when response is not JSON.
   }
   if (status === 429) {
-    return new Error("WB API 429: Слишком много запросов. Подождите 10-30 секунд и повторите.");
+    const retryHeader = responseHeaders?.get?.("x-ratelimit-retry");
+    const retrySeconds = Number(retryHeader);
+    if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
+      return new Error(
+        `WB API 429: Лимит WB. Повторите через ${Math.ceil(retrySeconds)} сек.`
+      );
+    }
+    return new Error("WB API 429: Лимит WB. Подождите 10-30 сек и повторите.");
   }
   return new Error(`WB API ${status}: ${detail}`);
 }
@@ -78,11 +85,11 @@ async function fetchJson(url, options = {}) {
     const text = await response.text();
     if (response.status === 429) {
       // Fail fast on rate-limit to avoid long UI freezes.
-      throw parseWbError(response.status, text);
+      throw parseWbError(response.status, text, response.headers);
     }
     const retriable = response.status >= 500;
     if (!retriable || attempt === WB_MAX_RETRIES) {
-      throw parseWbError(response.status, text);
+      throw parseWbError(response.status, text, response.headers);
     }
 
     await sleep(getRetryDelayMs(response, attempt));
