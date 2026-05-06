@@ -2,8 +2,8 @@ const FEEDBACK_BASE =
   process.env.WB_FEEDBACK_BASE_URL || "https://feedbacks-api.wildberries.ru";
 const CONTENT_BASE =
   process.env.WB_CONTENT_BASE_URL || "https://content-api.wildberries.ru";
-const WB_MAX_RETRIES = Number(process.env.WB_MAX_RETRIES || 4);
-const WB_RETRY_BASE_MS = Number(process.env.WB_RETRY_BASE_MS || 800);
+const WB_MAX_RETRIES = Number(process.env.WB_MAX_RETRIES || 6);
+const WB_RETRY_BASE_MS = Number(process.env.WB_RETRY_BASE_MS || 1200);
 
 function normalizeWbToken(rawToken) {
   if (typeof rawToken !== "string") {
@@ -42,7 +42,7 @@ function getRetryDelayMs(response, attempt) {
       return asNumber * 1000;
     }
   }
-  return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 10_000);
+  return Math.min(WB_RETRY_BASE_MS * (2 ** attempt), 30_000);
 }
 
 function parseWbError(status, text) {
@@ -316,11 +316,38 @@ function latestByDate(rows, limit) {
 
 async function fetchLatestReviews(token, nmId, limit = 500) {
   const take = Math.min(Math.max(limit, 1), 500);
-  const [unanswered, answered] = await Promise.all([
-    fetchFeedbacks(token, { nmId, isAnswered: false, take, skip: 0, order: "dateDesc" }),
-    fetchFeedbacks(token, { nmId, isAnswered: true, take, skip: 0, order: "dateDesc" }),
-  ]);
-  return latestByDate(unanswered.concat(answered), limit);
+  try {
+    // Prefer a single request to reduce pressure on WB rate limits.
+    const all = await fetchFeedbacks(token, {
+      nmId,
+      isAnswered: "all",
+      take,
+      skip: 0,
+      order: "dateDesc",
+    });
+    return latestByDate(all, limit);
+  } catch (err) {
+    const message = String(err?.message || "");
+    if (message.includes("429")) {
+      throw err;
+    }
+    // Fallback for accounts where `isAnswered=all` is not accepted.
+    const unanswered = await fetchFeedbacks(token, {
+      nmId,
+      isAnswered: false,
+      take,
+      skip: 0,
+      order: "dateDesc",
+    });
+    const answered = await fetchFeedbacks(token, {
+      nmId,
+      isAnswered: true,
+      take,
+      skip: 0,
+      order: "dateDesc",
+    });
+    return latestByDate(unanswered.concat(answered), limit);
+  }
 }
 
 async function fetchAllQuestions(token, nmId, limit = 10000) {
